@@ -78,16 +78,29 @@ class FootballTools:
             logger.error(f"Error retrieving team info: {e}")
             return "An error occured while retrieving team information."
 
-    def find_players_by_team_and_position(self, team_name: str, position: str) -> str:
-        """Find players by position."""
+    def find_players_by_team_and_position(self, query: str) -> str:
+        """Find players by team and position. Query should be in format: 'team_name, position' or 'team_name - position'."""
         if not self.search_service:
             return "Service unavailable: Failed to load team data."
 
         try:
+            # Parse the query to extract team name and position
+            if ',' in query:
+                parts = [part.strip() for part in query.split(',', 1)]
+            elif ' - ' in query:
+                parts = [part.strip() for part in query.split(' - ', 1)]
+            else:
+                return "Please provide both team name and position in format: 'team_name, position' (e.g., 'Liverpool, Midfielder')"
+
+            if len(parts) != 2:
+                return "Please provide both team name and position in format: 'team_name, position' (e.g., 'Liverpool, Midfielder')"
+
+            team_name, position = parts
+
             results = self.search_service.find_players_by_team_and_position(
                 team_name, position)
             if not results:
-                return f"No players found in position '{position}'."
+                return f"No players found for team '{team_name}' in position '{position}'."
 
             players_info = []
             for player in results:
@@ -99,6 +112,7 @@ class FootballTools:
                 })
 
             response = {
+                "team": team_name,
                 "position": position,
                 "count": len(results),
                 "players": players_info
@@ -126,6 +140,6 @@ class FootballTools:
             Tool(
                 name="Players_By_Team_And_Position",
                 func=self.find_players_by_team_and_position,
-                description="Find all players who play in a specific position (e.g., 'Goalkeeper', 'Defender', 'Midfielder', 'Forward') for a given team. Use this when asked about players in a certain position on a team."
+                description="Find all players who play in a specific position for a given team. Input should be formatted as 'team_name, position' (e.g., 'Liverpool, Midfielder' or 'Arsenal, Goalkeeper'). Available positions include: 'Goalkeeper', 'Defender', 'Midfielder', 'Forward'. Use this when asked about players in a certain position on a team."
             )
         ]
