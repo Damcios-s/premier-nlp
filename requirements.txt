@@ -4,9 +4,3 @@ langchain-openai==0.3.33
 langchain-core==0.3.76
 requests==2.32.5
 python-dotenv
-
-# Testing (can be moved to requirements-dev.txt)
-pytest
-
-# Development/Optional
-coverage
