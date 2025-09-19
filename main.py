@@ -4,6 +4,8 @@ from config.settings import load_config
 from agents.premier_league_agent import PremierLeagueAgent
 from tools.football_tools import FootballTools
 from services.football_api_service import FootballAPIService
+from services.search_service import SearchService
+from langchain_openai import AzureChatOpenAI
 
 logging.basicConfig(
     level=logging.INFO,
@@ -15,6 +17,19 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+
+def init_agent(config):
+    llm = AzureChatOpenAI(
+        azure_deployment=config.azure.deployment,
+        model_name=config.azure.model_name,
+        max_completion_tokens=config.max_completion_tokens,
+    )
+    api_service = FootballAPIService(config.football_api)
+    search_service = SearchService(api_service)
+    tools = FootballTools(search_service)
+    agent = PremierLeagueAgent(llm, tools)
+    return agent
 
 
 def main():
@@ -30,7 +45,8 @@ def main():
             sys.exit(1)
 
         logger.info("Initializing Premier League agent...")
-        agent = PremierLeagueAgent(config)
+
+        agent = init_agent(config)
 
         print("\n🏆 Premier League Info Agent is ready!")
         print("Ask me about Premier League teams, players, or positions.")

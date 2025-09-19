@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import List, Optional, Dict, Any
-from models.player import Player
+from data_classes.player import Player
+
 
 @dataclass
 class Team:
@@ -15,16 +16,17 @@ class Team:
     club_colors: Optional[str] = None
     venue: Optional[str] = None
     squad: List[Player] = None
-    
+
     def __post_init__(self):
         if self.squad is None:
             self.squad = []
-    
+
     @classmethod
     def from_api_data(cls, data: Dict[str, Any]) -> 'Team':
         squad_data = data.get('squad', [])
-        squad = [Player.from_api_data(player_data) for player_data in squad_data]
-        
+        squad = [Player.from_api_data(player_data)
+                 for player_data in squad_data] if squad_data else []
+
         return cls(
             id=data.get('id', 0),
             name=data.get('name', ''),

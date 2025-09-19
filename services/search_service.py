@@ -1,12 +1,12 @@
 from typing import List, Optional, Tuple
 from difflib import SequenceMatcher
-from models.team import Team
-from models.player import Player
+from data_classes.team import Team
+from data_classes.player import Player
 
 
 class SearchService:
-    def __init__(self, teams: List[Team]):
-        self.teams = teams
+    def __init__(self, team_data_store):
+        self.teams_data_store = team_data_store
 
     def _calculate_similarity(self, a: str, b: str) -> float:
         """Calculate similarity between two strings."""
@@ -17,7 +17,7 @@ class SearchService:
         best_match = None
         best_score = 0
 
-        for team in self.teams:
+        for team in self.teams_data_store.get_teams():
             # Check full name
             score = self._calculate_similarity(team_name, team.name)
             if score > best_score and score >= threshold:
@@ -46,7 +46,7 @@ class SearchService:
         best_team = None
         best_score = 0
 
-        for team in self.teams:
+        for team in self.teams_data_store.get_teams():
             for player in team.squad:
                 score = self._calculate_similarity(player_name, player.name)
                 if score > best_score and score >= threshold:

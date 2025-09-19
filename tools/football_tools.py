@@ -9,23 +9,10 @@ logger = logging.getLogger(__name__)
 
 
 class FootballTools:
-    def __init__(self, api_service: FootballAPIService):
-        self.api_service = api_service
-        self.search_service = None
-        self._initialize_search_service()
-
-    def _initialize_search_service(self):
-        try:
-            teams = self.api_service.get_teams()
-            self.search_service = SearchService(teams)
-            logger.info("SearchService initialized with teams data.")
-        except Exception as e:
-            logger.error(f"Failed to initialize SearchService: {e}")
+    def __init__(self, search_service: SearchService):
+        self.search_service = search_service
 
     def get_player_info(self, player_name: str) -> str:
-        if not self.search_service:
-            return "Search service is not available."
-
         try:
             result = self.search_service.find_player(player_name)
             if not result:
@@ -48,9 +35,6 @@ class FootballTools:
             return "An error occurred while retrieving player information."
 
     def get_team_info(self, team_name: str) -> str:
-        if not self.search_service:
-            return "Search service is not available."
-
         try:
             team = self.search_service.find_team(team_name)
             if not team:
@@ -80,8 +64,6 @@ class FootballTools:
 
     def find_players_by_team_and_position(self, query: str) -> str:
         """Find players by team and position. Query should be in format: 'team_name, position' or 'team_name - position'."""
-        if not self.search_service:
-            return "Service unavailable: Failed to load team data."
 
         try:
             # Parse the query to extract team name and position

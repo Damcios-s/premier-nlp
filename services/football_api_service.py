@@ -3,7 +3,7 @@ import json
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 import logging
-from models.team import Team
+from data_classes.team import Team
 from config.settings import FootballAPIConfig
 
 logger = logging.getLogger(__name__)
@@ -69,14 +69,3 @@ class FootballAPIService:
                 logger.warning("API failed, using stale cached data")
                 return self._teams_cache
             raise
-
-    def get_team_details(self, team_id: int) -> Optional[Team]:
-        """Get detailed information about a specific team."""
-        endpoint = f"teams/{team_id}"
-
-        try:
-            data = self._make_request(endpoint)
-            return Team.from_api_data(data)
-        except FootballAPIError as e:
-            logger.error(f"Failed to get team details for ID {team_id}: {e}")
-            return None
