@@ -1,0 +1,6 @@
+# Core dependencies
+langchain==0.3.27
+langchain-openai==0.3.33
+langchain-core==0.3.76
+requests==2.32.5
+python-dotenv
