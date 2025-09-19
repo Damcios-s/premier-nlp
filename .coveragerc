@@ -1,5 +1,6 @@
 [run]
 source = agents, services, data_classes, tools, config
+relative_files = true
 omit = 
     */test/*
     */__pycache__/*
