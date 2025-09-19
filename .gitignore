@@ -4,3 +4,9 @@
 .history
 
 __pycache__/
+
+.coverage
+htmlcov/
+coverage.xml
+
+*.log
