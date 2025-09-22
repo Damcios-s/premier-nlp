@@ -20,9 +20,6 @@ class TestTeamInitialization:
         assert team.name == "Liverpool"
         assert team.short_name is None
         assert team.tla is None
-        assert team.crest_url is None
-        assert team.address is None
-        assert team.website is None
         assert team.founded is None
         assert team.club_colors is None
         assert team.venue is None
@@ -38,9 +35,6 @@ class TestTeamInitialization:
             name="Liverpool",
             short_name="Liverpool FC",
             tla="LIV",
-            crest_url="https://example.com/crest.png",
-            address="Anfield Road, Liverpool",
-            website="https://liverpoolfc.com",
             founded=1892,
             club_colors="Red / White",
             venue="Anfield",
@@ -51,9 +45,6 @@ class TestTeamInitialization:
         assert team.name == "Liverpool"
         assert team.short_name == "Liverpool FC"
         assert team.tla == "LIV"
-        assert team.crest_url == "https://example.com/crest.png"
-        assert team.address == "Anfield Road, Liverpool"
-        assert team.website == "https://liverpoolfc.com"
         assert team.founded == 1892
         assert team.club_colors == "Red / White"
         assert team.venue == "Anfield"
@@ -81,7 +72,8 @@ class TestTeamFromApiData:
         # Mock Player.from_api_data to return mock player instances
         mock_player1 = Mock(spec=Player)
         mock_player2 = Mock(spec=Player)
-        mock_player_class.from_api_data.side_effect = [mock_player1, mock_player2]
+        mock_player_class.from_api_data.side_effect = [
+            mock_player1, mock_player2]
 
         api_data = {
             'id': 123,
@@ -111,8 +103,10 @@ class TestTeamFromApiData:
 
         # Verify Player.from_api_data was called with correct data
         assert mock_player_class.from_api_data.call_count == 2
-        mock_player_class.from_api_data.assert_any_call({'id': 1, 'name': 'Player 1'})
-        mock_player_class.from_api_data.assert_any_call({'id': 2, 'name': 'Player 2'})
+        mock_player_class.from_api_data.assert_any_call(
+            {'id': 1, 'name': 'Player 1'})
+        mock_player_class.from_api_data.assert_any_call(
+            {'id': 2, 'name': 'Player 2'})
 
     @patch('data_classes.team.Player')
     def test_from_api_data_minimal(self, mock_player_class):
@@ -184,7 +178,8 @@ class TestTeamFromApiData:
     def test_from_api_data_player_creation_error(self, mock_player_class):
         """Test handling of player creation errors during team creation."""
         # Mock Player.from_api_data to raise an exception
-        mock_player_class.from_api_data.side_effect = ValueError("Invalid player data")
+        mock_player_class.from_api_data.side_effect = ValueError(
+            "Invalid player data")
 
         api_data = {
             'id': 200,
@@ -237,7 +232,7 @@ class TestTeamDataclassFeatures:
         """Test that teams with different squads are not equal."""
         mock_player1 = Mock(spec=Player)
         mock_player2 = Mock(spec=Player)
-        
+
         team1 = Team(id=1, name="Team", squad=[mock_player1])
         team2 = Team(id=1, name="Team", squad=[mock_player2])
 

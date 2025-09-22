@@ -184,7 +184,7 @@ class TestMakeRequest:
         """Test API request with HTTP error."""
         mock_get.side_effect = requests.exceptions.HTTPError("404 Not Found")
 
-        with pytest.raises(FootballAPIError, match="Failed to fetch data.*404 Not Found"):
+        with pytest.raises(FootballAPIError, match="Failed to fetch data.*after 4 attempts.*404 Not Found"):
             api_service._make_request("test-endpoint")
 
     @patch('services.football_api_service.requests.get')
@@ -193,7 +193,7 @@ class TestMakeRequest:
         mock_get.side_effect = requests.exceptions.ConnectionError(
             "Connection failed")
 
-        with pytest.raises(FootballAPIError, match="Failed to fetch data.*Connection failed"):
+        with pytest.raises(FootballAPIError, match="Failed to fetch data.*after 4 attempts.*Connection failed"):
             api_service._make_request("test-endpoint")
 
     @patch('services.football_api_service.requests.get')
@@ -201,7 +201,7 @@ class TestMakeRequest:
         """Test API request with timeout error."""
         mock_get.side_effect = requests.exceptions.Timeout("Timeout occurred")
 
-        with pytest.raises(FootballAPIError, match="Failed to fetch data.*Timeout occurred"):
+        with pytest.raises(FootballAPIError, match="Failed to fetch data.*after 4 attempts.*Timeout occurred"):
             api_service._make_request("test-endpoint")
 
     @patch('services.football_api_service.requests.get')
@@ -213,8 +213,158 @@ class TestMakeRequest:
             "Invalid JSON", "", 0)
         mock_get.return_value = mock_response
 
-        with pytest.raises(FootballAPIError, match="Invalid JSON response"):
+        with pytest.raises(FootballAPIError, match="Invalid JSON response.*after 4 attempts"):
             api_service._make_request("test-endpoint")
+
+
+class TestRetryMechanism:
+    """Test the retry mechanism functionality."""
+
+    @patch('services.football_api_service.time.sleep')
+    @patch('services.football_api_service.requests.get')
+    def test_make_request_retry_on_connection_error(self, mock_get, mock_sleep, api_service):
+        """Test that connection errors trigger retries."""
+        # First three calls fail, fourth succeeds
+        mock_response = Mock()
+        mock_response.json.return_value = {"data": "success"}
+        mock_response.raise_for_status.return_value = None
+
+        mock_get.side_effect = [
+            requests.exceptions.ConnectionError("Connection failed"),
+            requests.exceptions.ConnectionError("Connection failed"),
+            requests.exceptions.ConnectionError("Connection failed"),
+            mock_response
+        ]
+
+        result = api_service._make_request("test-endpoint")
+
+        assert result == {"data": "success"}
+        assert mock_get.call_count == 4
+        assert mock_sleep.call_count == 3  # Should sleep before retries 2, 3, and 4
+        mock_sleep.assert_any_call(1)  # First retry: 2^0 = 1s
+        mock_sleep.assert_any_call(2)  # Second retry: 2^1 = 2s
+        mock_sleep.assert_any_call(4)  # Third retry: 2^2 = 4s
+
+    @patch('services.football_api_service.time.sleep')
+    @patch('services.football_api_service.requests.get')
+    def test_make_request_retry_on_server_error(self, mock_get, mock_sleep, api_service):
+        """Test that server errors (5xx) trigger retries."""
+        mock_response_error = Mock()
+        mock_response_error.status_code = 500
+
+        mock_response_success = Mock()
+        mock_response_success.json.return_value = {"data": "success"}
+        mock_response_success.raise_for_status.return_value = None
+
+        server_error = requests.exceptions.HTTPError("500 Server Error")
+        server_error.response = mock_response_error
+
+        mock_get.side_effect = [
+            server_error,
+            server_error,
+            mock_response_success
+        ]
+
+        result = api_service._make_request("test-endpoint")
+
+        assert result == {"data": "success"}
+        assert mock_get.call_count == 3
+        assert mock_sleep.call_count == 2
+
+    @patch('services.football_api_service.time.sleep')
+    @patch('services.football_api_service.requests.get')
+    def test_make_request_no_retry_on_client_error(self, mock_get, mock_sleep, api_service):
+        """Test that client errors (4xx) do not trigger retries."""
+        mock_response = Mock()
+        mock_response.status_code = 404
+
+        client_error = requests.exceptions.HTTPError("404 Not Found")
+        client_error.response = mock_response
+
+        mock_get.side_effect = client_error
+
+        with pytest.raises(FootballAPIError, match="Failed to fetch data.*after 1 attempts"):
+            api_service._make_request("test-endpoint")
+
+        assert mock_get.call_count == 1
+        assert mock_sleep.call_count == 0  # No retries, so no sleep
+
+    @patch('services.football_api_service.time.sleep')
+    @patch('services.football_api_service.requests.get')
+    def test_make_request_retry_exhausted(self, mock_get, mock_sleep, api_service):
+        """Test behavior when all retries are exhausted."""
+        mock_get.side_effect = requests.exceptions.ConnectionError(
+            "Connection failed")
+
+        with pytest.raises(FootballAPIError, match="Failed to fetch data.*after 4 attempts"):
+            api_service._make_request("test-endpoint")
+
+        assert mock_get.call_count == 4  # Initial + 3 retries
+        assert mock_sleep.call_count == 3
+
+    @patch('services.football_api_service.time.sleep')
+    @patch('services.football_api_service.requests.get')
+    def test_make_request_retry_json_decode_error(self, mock_get, mock_sleep, api_service):
+        """Test that JSON decode errors trigger retries."""
+        mock_response_error = Mock()
+        mock_response_error.raise_for_status.return_value = None
+        mock_response_error.json.side_effect = json.JSONDecodeError(
+            "Invalid JSON", "", 0)
+
+        mock_response_success = Mock()
+        mock_response_success.raise_for_status.return_value = None
+        mock_response_success.json.return_value = {"data": "success"}
+
+        mock_get.side_effect = [
+            mock_response_error,
+            mock_response_error,
+            mock_response_success
+        ]
+
+        result = api_service._make_request("test-endpoint")
+
+        assert result == {"data": "success"}
+        assert mock_get.call_count == 3
+        assert mock_sleep.call_count == 2
+
+    @patch('services.football_api_service.time.sleep')
+    @patch('services.football_api_service.requests.get')
+    def test_make_request_custom_max_retries(self, mock_get, mock_sleep, api_service):
+        """Test custom max_retries parameter."""
+        mock_get.side_effect = requests.exceptions.ConnectionError(
+            "Connection failed")
+
+        with pytest.raises(FootballAPIError, match="Failed to fetch data.*after 2 attempts"):
+            api_service._make_request("test-endpoint", max_retries=1)
+
+        assert mock_get.call_count == 2  # Initial + 1 retry
+        assert mock_sleep.call_count == 1
+
+    @patch('services.football_api_service.time.sleep')
+    @patch('services.football_api_service.requests.get')
+    def test_make_request_no_retries(self, mock_get, mock_sleep, api_service):
+        """Test behavior with max_retries=0."""
+        mock_get.side_effect = requests.exceptions.ConnectionError(
+            "Connection failed")
+
+        with pytest.raises(FootballAPIError, match="Failed to fetch data.*after 1 attempts"):
+            api_service._make_request("test-endpoint", max_retries=0)
+
+        assert mock_get.call_count == 1
+        assert mock_sleep.call_count == 0
+
+    @patch('services.football_api_service.requests.get')
+    def test_make_request_first_attempt_success(self, mock_get, api_service):
+        """Test that successful first attempt doesn't trigger retries."""
+        mock_response = Mock()
+        mock_response.json.return_value = {"data": "success"}
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+
+        result = api_service._make_request("test-endpoint")
+
+        assert result == {"data": "success"}
+        assert mock_get.call_count == 1  # Only called once
 
 
 class TestGetTeams:
