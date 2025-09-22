@@ -32,8 +32,10 @@ class FootballAPIService:
         """Make a request to the Football API with error handling and retry logic."""
         url = f"{self.config.base_url.rstrip('/')}/{endpoint.lstrip('/')}"
         last_exception = None
+        actual_attempts = 0
 
         for attempt in range(max_retries + 1):  # +1 to include the initial attempt
+            actual_attempts = attempt + 1
             try:
                 if attempt > 0:
                     # Exponential backoff: 1s, 2s, 4s for retries 1, 2, 3
@@ -51,7 +53,7 @@ class FootballAPIService:
                 logger.warning(
                     f"API request attempt {attempt + 1} failed: {e}")
 
-                if isinstance(e, requests.exceptions.HTTPError) and 400 <= e.response.status_code < 500:
+                if isinstance(e, requests.exceptions.HTTPError) and e.response is not None and 400 <= e.response.status_code < 500:
                     logger.error(
                         f"Client error {e.response.status_code}, not retrying")
                     break
@@ -70,10 +72,10 @@ class FootballAPIService:
         # If we get here, all retries failed
         if isinstance(last_exception, json.JSONDecodeError):
             raise FootballAPIError(
-                f"Invalid JSON response from {url} after {max_retries + 1} attempts")
+                f"Invalid JSON response from {url} after {actual_attempts} attempts")
         else:
             raise FootballAPIError(
-                f"Failed to fetch data from {url} after {max_retries + 1} attempts: {last_exception}")
+                f"Failed to fetch data from {url} after {actual_attempts} attempts: {last_exception}")
 
     def get_teams(self, use_cache: bool = True, cache_ttl_hours: int = 24) -> List[Team]:
         """Get all teams for the competition."""
