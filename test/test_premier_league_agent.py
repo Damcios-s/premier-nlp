@@ -74,6 +74,8 @@ class TestPremierLeagueAgentInitialization:
         assert agent.llm == mock_llm
         assert agent.tools == mock_football_tools
         assert agent.agent_executor == mock_executor
+        assert agent.mode == "strict"  # Default mode
+        assert agent.verbose == False  # Default verbose
 
         # Verify method calls
         mock_football_tools.get_tools.assert_called_once()
@@ -122,15 +124,43 @@ class TestPremierLeagueAgentInitialization:
         assert call_args[0][0] == "system"  # System message
         assert call_args[1][0] == "user"    # User message
 
+    @patch('agents.premier_league_agent.create_openai_tools_agent')
+    @patch('agents.premier_league_agent.AgentExecutor')
+    @patch('agents.premier_league_agent.ChatPromptTemplate')
+    def test_initialization_with_custom_parameters(self, mock_prompt_template, mock_agent_executor_class,
+                                                   mock_create_agent, mock_llm, mock_football_tools):
+        """Test initialization with custom mode and verbose parameters."""
+        mock_prompt = Mock()
+        mock_prompt_template.from_messages.return_value = mock_prompt
+        mock_create_agent.return_value = Mock()
+        mock_executor = Mock(spec=AgentExecutor)
+        mock_agent_executor_class.return_value = mock_executor
+
+        # Create agent with custom parameters
+        agent = PremierLeagueAgent(
+            mock_llm, mock_football_tools, mode="extended", verbose=True)
+
+        # Verify custom parameters are set
+        assert agent.mode == "extended"
+        assert agent.verbose == True
+
+        # Verify AgentExecutor is called with verbose=True
+        mock_agent_executor_class.assert_called_once_with(
+            agent=mock_create_agent.return_value,
+            tools=mock_football_tools.get_tools.return_value,
+            verbose=True
+        )
+
 
 class TestGetSystemPrompt:
     """Test the _get_system_prompt private method."""
 
-    def test_get_system_prompt_format(self, mock_llm, mock_football_tools):
-        """Test that system prompt is properly formatted."""
+    def test_get_system_prompt_strict_mode(self, mock_llm, mock_football_tools):
+        """Test that system prompt is properly formatted in strict mode."""
         with patch('agents.premier_league_agent.create_openai_tools_agent'), \
                 patch('agents.premier_league_agent.AgentExecutor'):
-            agent = PremierLeagueAgent(mock_llm, mock_football_tools)
+            agent = PremierLeagueAgent(
+                mock_llm, mock_football_tools, mode="strict")
 
             prompt = agent._get_system_prompt()
 
@@ -139,8 +169,50 @@ class TestGetSystemPrompt:
             assert len(prompt) > 100  # Should be substantial
 
             # Should have proper structure with rules and available information
-            assert "IMPORTANT RULES:" in prompt
-            assert "Available information:" in prompt
+            assert "ROLE:" in prompt
+            assert "CORE RULES:" in prompt
+            assert "AVAILABLE INFORMATION:" in prompt
+            assert "RESPONSE FORMATTING:" in prompt
+            assert "INVALID QUERIES:" in prompt
+
+            # Should NOT have extended rules in strict mode
+            assert "EXTENDED RULES:" not in prompt
+
+    def test_get_system_prompt_extended_mode(self, mock_llm, mock_football_tools):
+        """Test that system prompt includes extended rules in extended mode."""
+        with patch('agents.premier_league_agent.create_openai_tools_agent'), \
+                patch('agents.premier_league_agent.AgentExecutor'):
+            agent = PremierLeagueAgent(
+                mock_llm, mock_football_tools, mode="extended")
+
+            prompt = agent._get_system_prompt()
+
+            # Should be a string
+            assert isinstance(prompt, str)
+            assert len(prompt) > 100  # Should be substantial
+
+            # Should have all sections including extended rules
+            assert "ROLE:" in prompt
+            assert "CORE RULES:" in prompt
+            assert "EXTENDED RULES:" in prompt
+            assert "AVAILABLE INFORMATION:" in prompt
+            assert "RESPONSE FORMATTING:" in prompt
+            assert "INVALID QUERIES:" in prompt
+
+    def test_get_system_prompt_content_validation(self, mock_llm, mock_football_tools):
+        """Test that system prompt contains expected content."""
+        with patch('agents.premier_league_agent.create_openai_tools_agent'), \
+                patch('agents.premier_league_agent.AgentExecutor'):
+            agent = PremierLeagueAgent(mock_llm, mock_football_tools)
+
+            prompt = agent._get_system_prompt()
+
+            # Check for key content elements
+            assert "Premier League information assistant" in prompt
+            assert "ALWAYS use the provided tools" in prompt
+            assert "Player details" in prompt
+            assert "Team details" in prompt
+            assert "football assistant" in prompt
 
 
 class TestQueryMethod:
@@ -261,7 +333,7 @@ class TestAgentIntegration:
         mock_agent_executor_class.assert_called_once_with(
             agent=mock_agent,
             tools=tools_list,
-            verbose=True
+            verbose=agent.verbose
         )
 
     def test_tools_integration(self, mock_llm, mock_football_tools):

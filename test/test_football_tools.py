@@ -52,6 +52,12 @@ def football_tools(mock_search_service):
     return FootballTools(mock_search_service)
 
 
+@pytest.fixture
+def football_tools_extended(mock_search_service):
+    """Create a FootballTools instance with extended mode and mocked dependencies."""
+    return FootballTools(mock_search_service, mode="extended")
+
+
 class TestGetPlayerInfo:
     """Test the get_player_info method."""
 
@@ -322,9 +328,14 @@ class TestFindPlayersByTeamAndPosition:
 class TestGetTools:
     """Test the get_tools method that returns LangChain tools."""
 
-    def test_get_tools_returns_correct_number(self, football_tools):
-        """Test that get_tools returns the expected number of tools."""
+    def test_get_tools_returns_correct_number_strict_mode(self, football_tools):
+        """Test that get_tools returns the expected number of tools in strict mode."""
         tools = football_tools.get_tools()
+        assert len(tools) == 2
+
+    def test_get_tools_returns_correct_number_extended_mode(self, football_tools_extended):
+        """Test that get_tools returns the expected number of tools in extended mode."""
+        tools = football_tools_extended.get_tools()
         assert len(tools) == 3
 
     def test_get_tools_returns_langchain_tool_objects(self, football_tools):
@@ -339,9 +350,17 @@ class TestGetTools:
             assert hasattr(tool, 'func')
             assert hasattr(tool, 'description')
 
-    def test_get_tools_has_correct_tool_names(self, football_tools):
-        """Test that get_tools returns tools with expected names."""
+    def test_get_tools_has_correct_tool_names_strict_mode(self, football_tools):
+        """Test that get_tools returns tools with expected names in strict mode."""
         tools = football_tools.get_tools()
+        tool_names = [tool.name for tool in tools]
+
+        expected_names = ["Team_Info", "Players_By_Team_And_Position"]
+        assert set(tool_names) == set(expected_names)
+
+    def test_get_tools_has_correct_tool_names_extended_mode(self, football_tools_extended):
+        """Test that get_tools returns tools with expected names in extended mode."""
+        tools = football_tools_extended.get_tools()
         tool_names = [tool.name for tool in tools]
 
         expected_names = ["Player_Info", "Team_Info",
@@ -363,14 +382,22 @@ class TestGetTools:
             assert tool.description
             assert len(tool.description.strip()) > 0
 
-    def test_tool_functions_match_methods(self, football_tools):
-        """Test that tool functions match the corresponding methods."""
+    def test_tool_functions_match_methods_strict_mode(self, football_tools):
+        """Test that tool functions match the corresponding methods in strict mode."""
         tools = football_tools.get_tools()
         tool_dict = {tool.name: tool.func for tool in tools}
 
-        assert tool_dict["Player_Info"] == football_tools.get_player_info
         assert tool_dict["Team_Info"] == football_tools.get_team_info
         assert tool_dict["Players_By_Team_And_Position"] == football_tools.find_players_by_team_and_position
+
+    def test_tool_functions_match_methods_extended_mode(self, football_tools_extended):
+        """Test that tool functions match the corresponding methods in extended mode."""
+        tools = football_tools_extended.get_tools()
+        tool_dict = {tool.name: tool.func for tool in tools}
+
+        assert tool_dict["Player_Info"] == football_tools_extended.get_player_info
+        assert tool_dict["Team_Info"] == football_tools_extended.get_team_info
+        assert tool_dict["Players_By_Team_And_Position"] == football_tools_extended.find_players_by_team_and_position
 
 
 class TestIntegrationScenarios:
