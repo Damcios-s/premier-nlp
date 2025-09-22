@@ -1,5 +1,7 @@
 import logging
 import sys
+import argparse
+import time
 from config.settings import load_config
 from agents.premier_league_agent import PremierLeagueAgent
 from tools.football_tools import FootballTools
@@ -7,19 +9,45 @@ from services.football_api_service import FootballAPIService
 from services.search_service import SearchService
 from langchain_openai import AzureChatOpenAI
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('premier_league_agent.log'),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-
 logger = logging.getLogger(__name__)
 
 
-def init_agent(config):
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description='Premier League Info Agent')
+    parser.add_argument(
+        '-v', '--verbose',
+        action='store_true',
+        help='Enable verbose logging output'
+    )
+    parser.add_argument(
+        '-t', '--timing',
+        action='store_true',
+        help='Show timing information for queries'
+    )
+    parser.add_argument(
+        '-m', '--mode',
+        choices=['strict', 'extended'],
+        default='strict',
+        help='Enable extended mode for the agent'
+    )
+    return parser.parse_args()
+
+
+def setup_logging(verbose=False):
+    """Setup logging configuration based on verbosity level."""
+    log_level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler('premier_league_agent.log'),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+
+
+def init_agent(config, mode: str = "strict", verbose: bool = False) -> PremierLeagueAgent:
     llm = AzureChatOpenAI(
         azure_deployment=config.azure.deployment,
         model_name=config.azure.model_name,
@@ -28,11 +56,17 @@ def init_agent(config):
     api_service = FootballAPIService(config.football_api)
     search_service = SearchService(api_service)
     tools = FootballTools(search_service)
-    agent = PremierLeagueAgent(llm, tools)
+    agent = PremierLeagueAgent(llm, tools, mode, verbose)
     return agent
 
 
 def main():
+    # Parse command line arguments
+    args = parse_arguments()
+
+    # Setup logging based on verbosity
+    setup_logging(verbose=args.verbose)
+
     try:
         config = load_config()
 
@@ -50,6 +84,10 @@ def main():
 
         print("\n🏆 Premier League Info Agent is ready!")
         print("Ask me about Premier League teams, players, or positions.")
+        if args.verbose:
+            print("📝 Verbose logging enabled")
+        if args.timing:
+            print("⏱️  Timing information enabled")
         print("Type 'exit' to quit.\n")
 
         # Main interaction loop
@@ -65,7 +103,18 @@ def main():
                     continue
 
                 print("\n🤔 Processing your question...")
+
+                # Track timing if requested
+                if args.timing:
+                    start_time = time.time()
+
                 response = agent.query(query)
+
+                if args.timing:
+                    end_time = time.time()
+                    duration = end_time - start_time
+                    print(f"\n⏱️  Query processed in {duration:.2f} seconds")
+
                 print(f"\n✅ {response}\n")
                 print("-" * 80)
 

@@ -8,9 +8,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+available_positions = ['Attacking Midfield', 'Central Midfield', 'Centre-Back',
+                       'Centre-Forward', 'Defence', 'Defensive Midfield',
+                       'Goalkeeper', 'Left Midfield', 'Left Winger', 'Left-Back',
+                       'Midfield', 'Offence', 'Right Midfield', 'Right Winger',
+                       'Right-Back']
+
+
 class FootballTools:
-    def __init__(self, search_service: SearchService):
+    def __init__(self, search_service: SearchService, mode: str = "strict"):
         self.search_service = search_service
+        self.mode = mode
 
     def get_player_info(self, player_name: str) -> str:
         try:
@@ -108,20 +116,33 @@ class FootballTools:
 
     def get_tools(self) -> List[Tool]:
         """Get the list of LangChain tools."""
-        return [
-            Tool(
-                name="Player_Info",
-                func=self.get_player_info,
-                description="Get detailed information about a specific Premier League player by name. Use this when asked about a specific player."
-            ),
+        tools = [
             Tool(
                 name="Team_Info",
                 func=self.get_team_info,
-                description="Get detailed information about a specific Premier League team including stadium, founding year, colors, etc. Use this when asked about a specific team."
+                description="Get detailed information about a specific "
+                "Premier League team including squad, stadium, founding year, "
+                "colors, etc. Use this when asked about a specific team."
             ),
             Tool(
                 name="Players_By_Team_And_Position",
                 func=self.find_players_by_team_and_position,
-                description="Find all players who play in a specific position for a given team. Input should be formatted as 'team_name, position' (e.g., 'Liverpool, Midfielder' or 'Arsenal, Goalkeeper'). Available positions include: 'Goalkeeper', 'Defender', 'Midfielder', 'Forward'. Use this when asked about players in a certain position on a team."
+                description=f"Find all players who play in a specific "
+                f"position for a given team. Input should be formatted as "
+                f"'team_name, position' (e.g., 'Liverpool, Midfielder' or "
+                f"'Arsenal, Goalkeeper'). Available positions include: "
+                f"{', '.join(available_positions)}. Use this when asked about"
+                f" players in a certain position on a team."
             )
         ]
+        if self.mode == "extended":
+            tools.extend([
+                Tool(
+                    name="Player_Info",
+                    func=self.get_player_info,
+                    description="Get detailed information about a specific "
+                    "Premier League player by name. Use this when asked about "
+                    "a specific player."
+                ),
+            ])
+        return tools

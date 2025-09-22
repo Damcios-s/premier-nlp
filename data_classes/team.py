@@ -9,9 +9,6 @@ class Team:
     name: str
     short_name: Optional[str] = None
     tla: Optional[str] = None  # Three Letter Abbreviation
-    crest_url: Optional[str] = None
-    address: Optional[str] = None
-    website: Optional[str] = None
     founded: Optional[int] = None
     club_colors: Optional[str] = None
     venue: Optional[str] = None
@@ -32,9 +29,6 @@ class Team:
             name=data.get('name', ''),
             short_name=data.get('shortName'),
             tla=data.get('tla'),
-            # crest_url=data.get('crest'),
-            # address=data.get('address'),
-            # website=data.get('website'),
             founded=data.get('founded'),
             club_colors=data.get('clubColors'),
             venue=data.get('venue'),
